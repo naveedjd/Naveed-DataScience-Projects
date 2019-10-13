@@ -1,0 +1,478 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf500
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww25400\viewh16000\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 -- IMPORTANT: BEFORE CREATING ANY TABLE, MAKE SURE YOU RUN THIS COMMAND \
+ADD JAR /opt/cloudera/parcels/CDH/lib/hive/lib/hive-hcatalog-core-1.1.0-cdh5.11.2.jar;\
+\
+drop table nytaxi_nj;\
+\
+-- CREATE EXTERNAL TABLE \
+CREATE EXTERNAL TABLE NYTaxi_nj(\
+`vendorid` int,\
+`pickup_dt` timestamp,\
+`drop_dt` timestamp,\
+`passenger_count` int,\
+`trip_distance` double,\
+`ratecode_id` int,\
+`store_and_fwd_flag` char(1),\
+`pulocation_id` int,\
+`dolocation_id` int,\
+`payment_type` int,\
+`fare_amount` double,\
+`extra` double,\
+`mta_tax` double,\
+`tip_amount` double,\
+`tolls_amount` double,\
+`improvement_surcharge` double,\
+`total_amount` double)\
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','\
+STORED AS TEXTFILE\
+LOCATION '/common_folder/nyc_taxi_data/'\
+tblproperties ("skip.header.line.count"="1");\
+\
+-- checking data if inserted properly\
+select * from nytaxi_nj limit 10;\
+\
+-- Basic Data Quality Checks\
+\
+select count(*) from nytaxi_nj;\
+\
+-- There are 1,174,569 records provided in total\
+\
+-- Checking How many records per TPEP provider\
+\
+Select vendorid, count(*) as `number_records`\
+from nytaxi_nj\
+group by vendorid;\
+\
+-- VeriFone Inc. TPEP have provided 647,183 recors\
+-- Creative Mobile Technologies, LLC  TPEP have provided 527,386 records\
+\
+select year(pickup_dt), count(*)\
+from nytaxi_nj\
+group by year(pickup_dt);\
+\
+-- There are some records which shows pcik up data from years other than 2017..\
+-- Precisely there are 8 records from year other than 2017\
+\
+select year(drop_dt), count(*)\
+from nytaxi_nj\
+group by year(drop_dt);\
+\
+-- There are more errorneous records where number of drop dates are not in 2017 and also they not in sync with pick date\
+\
+select year(pickup_dt) as pickup_year, month(pickup_dt) as pickup_mnth, year(drop_dt) as drop_year, month(drop_dt) as drop_month,count(*) as number_records\
+from nytaxi_nj\
+group by vendorid,year(pickup_dt), month(pickup_dt), year(drop_dt), month(drop_dt);\
+\
+-- The above query shows that there are records from non 2017 years and also from other months apart from Nov and Dec\
+-- Also we notice that pick up dates and drop dates are not in sync , we see the range more in year difference also\
+\
+select vendorid,datediff(drop_dt,pickup_dt) as dtdiff\
+from nytaxi_nj\
+where 'dtdiff' > '1'\
+order by dtdiff desc;\
+== where dtdiff > 0;\
+\
+-- Error records - 1 record where date difference is 526 days\
+-- Error records - 14 non 2017 and non-Nov/Dec records\
+\
+--Let's check which vendors have given this date erroneous records\
+\
+select vendorid,count(*)\
+from nytaxi_nj\
+where year(pickup_dt) != 2017\
+and month(pickup_dt) != 11\
+--and month(pickup_dt) != 12\
+group by vendorid;\
+\
+-- There are 8 non November 2017 records provided by VeriFone Inc.\
+\
+select vendorid,count(*)\
+from nytaxi_nj\
+where year(pickup_dt) != 2017\
+--and month(pickup_dt) != 11\
+and month(pickup_dt) != 12\
+group by vendorid;\
+\
+-- There are 6 non December 2017 records provided by VeriFone Inc.\
+\
+--- So in total 14 date erroneous records provided by VeriFone Inc.\
+\
+--- NOW Let's check which vendor provided 526 records gap record\
+select vendorid, pickup_dt, drop_dt, datediff(drop_dt,pickup_dt) as dtdiff\
+from nytaxi_nj\
+--where 'dtdiff' > 500\
+order by dtdiff desc\
+limit 10;\
+       \
+-- Creative Mobile Technologies, LLC provided this record where pickup_dt is Nov 2017 and Drop_dt is in April 2019...which is an\
+-- errorneous record for sure\
+\
+-- Let''s check where passenger count is zero\
+select vendorid,count(*)\
+from nytaxi_nj\
+where passenger_count = 0\
+group by vendorid;\
+\
+-- Creative Mobile Technologies, LLC have provided 6813 records where the drivers have entered passenger count as ZERO\
+-- whereas VeriFone Inc. have provided 11 such records\
+\
+-- let's check the fare_amount for this passenger_count Zero records\
+\
+select vendorid, fare_amount\
+from nytaxi_nj\
+where passenger_count = 0;\
+\
+--- Now since fare_amount are been calculated, let's not consider passenger_count zero records for removal..since driver enters this\
+--- manually, the passenger_count fields are not entered correctly\
+\
+select vendorid, count(*)\
+from nytaxi_nj\
+where pulocation_id = dolocation_id\
+group by vendorid;\
+\
+-- This query shows number of the records where the location id of taxi engaged and disengaged are same which suggests there are\
+-- some issues in this trips\
+--- Bothe vendors have erred on this where Creative Mobile Technologies, LLC have 42,275 such records and VeriFone Inc have 40,419 records\
+---Since this records are more . let's check what is the fare_amount for this same location_id trips\
+\
+select vendorid, fare_amount\
+from nytaxi_nj\
+where pulocation_id = dolocation_id\
+order by fare_amount desc;\
+\
+--- The fare_amount suggests that though location_id are same, the amount appears to be normal..let's not this errorneous records\
+\
+select vendorid, count(*)\
+from nytaxi_nj\
+where ratecode_id ! between 1 and 6\
+group by vendorid;\
+\
+-- Creative Mobile Technologies, LLC have provided 8 records where ratecodeid is not in the range 1 and 6\
+-- VeriFone Inc. have provided 1 such record\
+\
+select vendorid, count(*)\
+from nytaxi_nj\
+where store_and_fwd_flag not in ('Y','N')\
+group by vendorid;\
+\
+-- No error records for column store_and_fwd_flag\
+\
+select vendorid, count(*)\
+from nytaxi_nj\
+where payment_type ! between 1 and 6\
+group by vendorid;\
+\
+-- No error records for column payment_type\
+\
+\
+--- Errorneous Record's features are identified as\
+--- 1. Non November and Decemmber 2017 records\
+--- 2. Pick Up date is in Nov 2017 and Drop Dt is April 2019\
+--- 3. Passenger Count as Zero but this records will be not cleaned up as they have fare_amount and now since this driver entered details this could be human error\
+--- 4. The meter engagement and disengagement location_id are same but again this records will not be deleted\
+--- 5. The ratecode_id are not in the range of 1 and 6\
+--- 6. In terms of the above errorneous records featurs, Creative Mobile Technologies, LLC have done a bad job compared to VeriFone Inc.\
+--- 7 . Above features 1,2 and 5 records will be cleaned up before Analysis\
+\
+-- PARTITION THE DATA  \
+-- IMPORTANT: BEFORE PARTITIONING ANY TABLE, MAKE SURE YOU RUN THESE COMMANDS \
+SET hive.exec.max.dynamic.partitions=100000;\
+SET hive.exec.max.dynamic.partitions.pernode=100000;\
+\
+-- First drop the table \
+drop table nytaxi_nj_partitioned;\
+\
+-- Then create external table \
+create external table if not exists nytaxi_nj_partitioned\
+(\
+`vendorid` int,\
+`pickup_dt` timestamp,\
+`drop_dt` timestamp,\
+`passenger_count` int,\
+`trip_distance` double,\
+`ratecode_id` int,\
+`store_and_fwd_flag` char(1),\
+`pulocation_id` int,\
+`dolocation_id` int,\
+`payment_type` int,\
+`fare_amount` double,\
+`extra` double,\
+`mta_tax` double,\
+`tip_amount` double,\
+`tolls_amount` double,\
+`improvement_surcharge` double,\
+`total_amount` double)\
+partitioned by (yr int, mnth int)\
+location '/user/hive/warehouse/naveed';\
+\
+-- Then insert the data in the table \
+insert overwrite table nytaxi_nj_partitioned partition(yr, mnth)\
+select vendorid,pickup_dt,drop_dt,passenger_count,trip_distance,ratecode_id,store_and_fwd_flag,pulocation_id,dolocation_id,\
+payment_type,fare_amount,extra,mta_tax,tip_amount,tolls_amount,improvement_surcharge,total_amount, \
+year(pickup_dt) as yr, month(pickup_dt) as mnth\
+from nytaxi_nj;\
+\
+select * from nytaxi_nj_partitioned limit 10;\
+\
+-- BUCKETING THE DATA  \
+\
+\
+-- First drop the table \
+drop table nytaxi_nj_partitioned_clustered;\
+\
+-- Then create external table \
+create external table if not exists nytaxi_nj_partitioned_clustered\
+(\
+`vendorid` int,\
+`pickup_dt` timestamp,\
+`drop_dt` timestamp,\
+`passenger_count` int,\
+`trip_distance` double,\
+`ratecode_id` int,\
+`store_and_fwd_flag` char(1),\
+`pulocation_id` int,\
+`dolocation_id` int,\
+`payment_type` int,\
+`fare_amount` double,\
+`extra` double,\
+`mta_tax` double,\
+`tip_amount` double,\
+`tolls_amount` double,\
+`improvement_surcharge` double,\
+`total_amount` double)\
+partitioned by (yr int, mnth int)\
+clustered by (vendorid) into 2 buckets\
+location '/user/hive/warehouse/naveed_bucket';\
+\
+SET hive.exec.max.dynamic.partitions=100000;\
+SET hive.exec.max.dynamic.partitions.pernode=100000;\
+\
+-- Then insert the data in the table \
+insert overwrite table nytaxi_nj_partitioned_clustered partition(yr, mnth)\
+select vendorid,pickup_dt,drop_dt,passenger_count,trip_distance,ratecode_id,store_and_fwd_flag,pulocation_id,dolocation_id,\
+payment_type,fare_amount,extra,mta_tax,tip_amount,tolls_amount,improvement_surcharge,total_amount, \
+year(pickup_dt) as yr, month(pickup_dt) as mnth\
+from nytaxi_nj_partitioned;\
+\
+-- Let's try and do some basic EDA on the partitioned table \
+-- We're trying to find the number of reviews for a certain year and month \
+-- First, run the query on non-partitioned data \
+\
+select vendorid, count(*) as review_count\
+from nytaxi_nj\
+where year(pickup_dt) = 2017\
+and month(pickup_dt) in (11,12)\
+group by vendorid;\
+\
+-- Then, run the same query on the partitioned table \
+\
+select vendorid, count(*) as review_count\
+from nytaxi_nj_partitioned\
+where yr = 2017\
+and mnth in (11,12)\
+group by vendorid;\
+\
+-- The above query perform well on partitioned table \
+-- Let's create ORC table and load only only Nov and Dec 2017 records only\
+\
+-- Then create external table \
+create external table if not exists nytaxi_nj_partitioned_orc\
+(\
+`vendorid` int,\
+`pickup_dt` timestamp,\
+`drop_dt` timestamp,\
+`passenger_count` int,\
+`trip_distance` double,\
+`ratecode_id` int,\
+`store_and_fwd_flag` char(1),\
+`pulocation_id` int,\
+`dolocation_id` int,\
+`payment_type` int,\
+`fare_amount` double,\
+`extra` double,\
+`mta_tax` double,\
+`tip_amount` double,\
+`tolls_amount` double,\
+`improvement_surcharge` double,\
+`total_amount` double)\
+partitioned by (yr int, mnth int)\
+stored as orc location '/user/hive/warehouse/naveed_orc'\
+tblproperties ("orc.compress"="SNAPPY");\
+\
+\
+-- Then, write  data from partition table into ORC table\
+-- Loading all clean data only into ORC table i.e. all the erroneous records identified above have been eliminated using query below\
+\
+insert overwrite table nytaxi_nj_partitioned_orc partition(yr , mnth)\
+select * from nytaxi_nj_partitioned\
+where yr = 2017\
+and mnth in (11,12)\
+and year(drop_dt) != 2019\
+and ratecode_id between 1 and 6;\
+\
+select count(*) from nytaxi_nj_partitioned_orc;\
+\
+select count(*) from nytaxi_nj_partitioned\
+where yr = 2017\
+and mnth in (11,12)\
+and year(drop_dt) != 2019\
+and ratecode_id between 1 and 6;\
+\
+-- Original records - 1,174,569 records\
+--- After Clean up  - 1,174,545 records\
+-- 24 records have been cleaned up\
+\
+-- Analysis-I\
+\
+-- Question - 1\
+select mnth, avg(fare_amount)\
+from nytaxi_nj_partitioned_orc\
+group by mnth;\
+\
+--- Average Fare Aount for November is 13.10 and December is 12.90\
+\
+-- Question - 2\
+select passenger_count, count(*)\
+from nytaxi_nj_partitioned_orc\
+group by passenger_count\
+order by 2 desc;\
+\
+-- 1 Passenger - 827,484 times\
+-- 2 Passengers - 176,871 times\
+-- 5 passengers - 54,567 times\
+-- 3 passengers - 50,693 times\
+-- 4 passengers - 24,951 times\
+-- 7 passengers - 12 times\
+-- 8 passengers - 3 times\
+-- 9 Passengers - 1 time\
+\
+-- Most People Prefer to travel SOLO\
+\
+-- Question - 3\
+\
+select payment_type, count(*)\
+from nytaxi_nj_partitioned_orc\
+group by payment_type;\
+\
+-- Credit Card is the most preferred payment mode\
+\
+-- Question - 4\
+select avg(tip_amount)\
+from nytaxi_nj_partitioned_orc;\
+\
+-- Average Tip Amount is 1.853\
+\
+-- The below query gives 25th, 50th and 75th percentile of the tip_amount\
+select percentile_approx(tip_amount,array(0.25,0.50,0.75))\
+ from nytaxi_nj_partitioned_orc;\
+ \
+-- 25th - 0, 50th - 1.35 , 75th - 2.45\
+-- Since the Average is 1.85 and and it is more than 60th percentile it can be considered as a representative statistic\
+\
+-- Question - 5\
+\
+select count(*)\
+from nytaxi_nj_partitioned_orc\
+where extra > 0;\
+\
+-- Out of 1,174,545 trips,  542,401 have charged extra fare which is about 0.46 fraction of total trips i.e. 46% of total trips where extra fare has been levied\
+\
+-- Analysis - II\
+\
+-- Question - 1\
+select corr(passenger_count, tip_amount)\
+from nytaxi_nj_partitioned_orc;\
+\
+-- There seems to be not any correlation between them\
+\
+select avg(tip_amount)\
+from nytaxi_nj_partitioned_orc\
+where passenger_count = 1;\
+\
+-- Average Tip paid by Solo passengers is 1.86\
+\
+select avg(tip_amount)\
+from nytaxi_nj_partitioned_orc\
+where passenger_count > 1;\
+\
+-- Average tip paid by Multiple Passengers is 1.83 which is little less than Solo Passengers\
+\
+-- Question - 2\
+\
+select \
+round((sum(case when tip_amount between 0 and 5 then 1 else 0 end)/count(*)) * 100) as tip_0_5,\
+round((sum(case when tip_amount between 5 and 10 then 1 else 0 end)/count(*)) * 100) as tip_5_10,\
+round((sum(case when tip_amount between 10 and 15 then 1 else 0 end)/count(*)) * 100) as tip_10_15,\
+round((sum(case when tip_amount between 15 and 20 then 1 else 0 end)/count(*)) * 100) as tip_15_20,\
+round((sum(case when tip_amount >= 20 then 1 else 0 end)/count(*)) * 100) as tip_ge_20\
+from nytaxi_nj_partitioned_orc;\
+\
+--- Tip_amount between 0-5 is around 92%\
+--- Tip_amount between 5-10 is around 6%\
+--- Tip_amount between 10-15 is around 2%\
+--- Rest is 0%\
+\
+\
+-- Question 3\
+\
+---To get trip distance in minutes\
+\
+SELECT pickup_dt, drop_dt, (unix_timestamp(drop_dt) \
+      - unix_timestamp(pickup_dt))/60 \
+from nytaxi_nj_partitioned_orc\
+limit 10;\
+\
+--- Calculating Average Speed as Sum of trip_distance / Sum of Time per hour Month wise\
+\
+Select mnth, Sum(trip_distance)/sum(((unix_timestamp(drop_dt) \
+      - unix_timestamp(pickup_dt))/60)/60) as avg_speed\
+from nytaxi_nj_partitioned_orc\
+group by mnth;\
+\
+--- The Average Speed miles/hr of November(9.86) is slightly higher than December (9.82)\
+\
+-- Question 4\
+\
+-- To find Overall Speed Average miles per hour\
+\
+Select Sum(trip_distance)/sum(((unix_timestamp(drop_dt) \
+      - unix_timestamp(pickup_dt))/60)/60) as avg_speed\
+from nytaxi_nj_partitioned_orc;\
+\
+--- Overall Average Speed is 9.84 miles/hour\
+\
+-- To find Average Speed on Dec 31st\
+\
+\
+Select Sum(trip_distance)/sum(((unix_timestamp(drop_dt) \
+      - unix_timestamp(pickup_dt))/60)/60) as avg_speed\
+from nytaxi_nj_partitioned_orc\
+where date(pickUp_dt) = '2017-12-31'\
+and mnth = 12\
+and yr = 2017;\
+\
+-- Average speed is 0.19 miles/hr on Dec 31st\
+\
+-- To find Average Speed on Dec 25th\
+\
+Select Sum(trip_distance)/sum(((unix_timestamp(drop_dt) \
+      - unix_timestamp(pickup_dt))/60)/60) as avg_speed\
+from nytaxi_nj_partitioned_orc\
+where date(pickUp_dt) = '2017-12-25'\
+and mnth = 12\
+and yr = 2017;\
+\
+-- Average speed is 0.21 miles/hr on Dec 25th\
+\
+--- Average speed(0.19 & 0.21 miles/hr) is much lower than the Overall Average Speed(9.84 miles/hr) on both this happening days which could be due to the traffic on this days\
+\
+     \
+\
+\
+}
