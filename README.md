@@ -1,17 +1,17 @@
 # Naveed-DataScience-Projects
- My Data Science Projects
+## My Data Science Projects
  
- #Capstone_BFSI_Final Submission.ipynb
+ ## Capstone_BFSI_Final Submission.ipynb
  Credit Risk Modelling -  For a Credit Card company identify the right customers using predictive models. Using past data of the bank’s applicants, you need to determine the factors affecting credit risk, create strategies to mitigate the acquisition risk and assess the financial benefit of your project.  
  
- #Advanced Regression Assignment_Naveed Jeddy.ipynb
+ ## Advanced Regression Assignment_Naveed Jeddy.ipynb
  For a Real State company, to model the price of houses with the available independent variables. It will then be used by the management to understand how exactly the prices vary with the variables. They can accordingly manipulate the strategy of the firm and concentrate on areas that will yield high rewards. Further, the model will be a good way for management to understand the pricing dynamics of a new market.
  
- #SVM_Digit Recognizer Assignment_Naveed Jeddy.ipynb
+ ## SVM_Digit Recognizer Assignment_Naveed Jeddy.ipynb
  To develop a model using Support Vector Machine which should correctly classify the handwritten digits from 0-9 based on the pixel values given as features. Thus, this is a 10-class classification problem. 
  
  
- #Telecom Churn - Group Case Study-13-May-2019 Final.ipynb
+ ## Telecom Churn - Group Case Study-13-May-2019 Final.ipynb
  For a Telecom company, The business objective is to predict the churn in the last (i.e. the ninth) month using the data (features) from the first three months.
  
  #SPARK_NYC Parking Tickets-EDA-Case Study.ipynb
