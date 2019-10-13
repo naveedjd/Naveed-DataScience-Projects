@@ -1,7 +1,7 @@
 # Naveed-DataScience-Projects
 ### My Data Science Projects
  
- ####  1. Capstone_BFSI_Final Submission.ipynb
+ ####  1. Acquisition Risk Analytics_BFSI_Final Submission.ipynb
  Credit Risk Modelling -  For a Credit Card company identify the right customers using predictive models. Using past data of the bank’s applicants, you need to determine the factors affecting credit risk, create strategies to mitigate the acquisition risk and assess the financial benefit of your project.  
  
  #### 2. Advanced Regression Assignment_Naveed Jeddy.ipynb
