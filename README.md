@@ -29,7 +29,7 @@
  To model the price of cars with the available independent variables. It will be used by the management to understand how exactly the prices vary with the independent variables. They can accordingly manipulate the design of the cars, the business strategy etc. to meet certain price levels.
  
  #### 9.	EDA Case Study - Gramener Loan Risk.ipynb
-  Risk Analysis for a Online loan scheme of a Consumer Finance company
+  Risk Analysis for a Online loan scheme of a Consumer Finance company. To identify patterns which indicate if a person is likely to default, which may be used for taking actions such as denying the loan, reducing the amount of loan, lending (to risky applicants) at a higher interest rate, etc.
  
  #### 10.	Uber_Assignment.ipynb
   Understand the Uber taxi to and fro Airport commute trips data and to identify the root cause of the problem (i.e.  cancellation and non-availability of cars) and recommend ways to improve the situation. As a result of your analysis, you should be able to present to the client the root cause(s) and possible hypotheses of the problem(s) and recommend ways to improve them. 
